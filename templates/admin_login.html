@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Admin Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-900 text-slate-200 flex items-center justify-center">
+    <div class="w-full max-w-md bg-gray-800 p-8 rounded-xl shadow-lg">
+        <h1 class="text-2xl font-bold mb-4">Admin Login</h1>
+        <div class="space-y-3">
+            <input id="username" placeholder="Username" class="w-full p-3 rounded bg-gray-900 border border-gray-700" />
+            <input id="password" placeholder="Password" type="password" class="w-full p-3 rounded bg-gray-900 border border-gray-700" />
+            <button id="loginBtn" class="w-full bg-teal-400 text-gray-900 font-bold py-2 rounded">Sign In</button>
+            <p id="msg" class="text-sm text-red-400"></p>
+        </div>
+    </div>
+
+    <script>
+       // Inside admin_login.html <script>
+document.getElementById('loginBtn').addEventListener('click', async function() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    
+    const res = await fetch('/admin/login', {
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+        window.location.href = '/admin'; // Redirects to Dashboard
+    } else {
+        document.getElementById('msg').textContent = data.message;
+    }
+});
+    </script>
+</body>
+</html>

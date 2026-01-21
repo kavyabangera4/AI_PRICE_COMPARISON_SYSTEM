@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Price Comparison System</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            900: '#0f172a', 
+                            800: '#1e293b', 
+                            700: '#334155', 
+                        },
+                        brand: {
+                            teal: '#2dd4bf', 
+                            blue: '#3b82f6', 
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        // Contact form submission
+        document.addEventListener('DOMContentLoaded', function(){
+            const btn = document.getElementById('contact-send');
+            if (!btn) return;
+            btn.addEventListener('click', async () => {
+                const name = document.getElementById('contact-name').value.trim();
+                const email = document.getElementById('contact-email').value.trim();
+                const message = document.getElementById('contact-message').value.trim();
+                const status = document.getElementById('contact-status');
+                status.textContent = '';
+                if (!name || !email || !message) { status.textContent = 'Please fill all fields.'; return; }
+                try {
+                    const res = await fetch('/api/submit_query', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name, email, message}) });
+                    const j = await res.json();
+                    if (res.ok && j.success) { 
+                        status.textContent = 'Message sent — thank you.'; 
+                        document.getElementById('contact-form').reset(); 
+                    }
+                    else { status.textContent = j.message || 'Failed to send.'; }
+                } catch (err) { 
+                    console.error('Contact form error:', err);
+                    status.textContent = 'Server error. Please try again.'; 
+                }
+            });
+        });
+    </script>
+    
+    <style>
+        body { overflow-x: hidden; }
+        .glass-nav {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        .hero-gradient {
+            background: radial-gradient(circle at center, rgba(45, 212, 191, 0.15) 0%, rgba(15, 23, 42, 1) 70%);
+        }
+        /* Hide scrollbar for clean dashboard look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        
+        /* Utility to hide/show sections */
+        .hidden-section { display: none !important; }
+
+        /* --- NEW GRID/BOX CSS FOR SEARCH RESULTS --- */
+        .product-grid {
+            display: grid;
+            /* Creates responsive columns: 
+               Min width 250px, Max 1fr (fills remaining space) */
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px; /* Space between the boxes */
+            padding: 10px 0;
+        }
+
+        .product-box {
+            background-color: #1e293b; 
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+            transition: transform 0.2s;
+        }
+        
+        .product-box:hover {
+            transform: translateY(-4px);
+            border: 1px solid #2dd4bf;
+        }
+
+        .product-box .product-image {
+            width: 100%;
+            height: 180px; /* Fixed height for consistent look */
+            object-fit: contain; /* Prevents stretching */
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background-color: #0f172a; /* Dark background for transparent images */
+            padding: 10px;
+        }
+
+        .product-details {
+            text-align: left;
+            margin-bottom: 10px;
+        }
+
+        .product-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            line-height: 1.3;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        
+        .product-price {
+            font-size: 1.6em;
+            color: #2dd4bf; 
+            font-weight: bold;
+            margin: 10px 0 15px 0;
+        }
+        .btn-view-deal {
+            display: block;
+            text-align: center;
+            padding: 10px;
+            background-color: #2dd4bf;
+            color: #0f172a;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .btn-view-deal:hover {
+            background-color: #6ee7f9;
+        }
+        .btn-set-alert {
+            display: inline-block;
+            text-align: center;
+            padding: 8px 12px;
+            background-color: #f97316; /* orange */
+            color: #0f172a;
+            font-weight: 700;
+            border-radius: 8px;
+            transition: background-color 0.15s;
+        }
+        .btn-set-alert:hover { background-color: #fb923c; }
+
+        /* Container for the image and the heart icon */
+.product-image-container {
+    position: relative; /* CRITICAL: Allows absolute positioning of children */
+    overflow: hidden;
+    /* Add padding/margin as needed */
+}
+
+.product-image-container img {
+    width: 100%;
+    display: block;
+}
+
+/* Style for the Wishlist Button (Heart Icon) */
+.wishlist-btn {
+    position: absolute; /* CRITICAL: Positions button relative to .product-image-container */
+    top: 10px;          /* Place it near the top */
+    right: 10px;        /* Place it near the right edge */
+    
+    /* Style the icon */
+    /*background: rgba(255, 255, 255, 0.8); /* Semi-transparent background */
+    border: none;
+    /*border-radius: 50%; /* Makes it a circle */
+    width: 40px;
+    height: 40px;
+    font-size: 30px; /* Makes the heart symbol bigger */
+    cursor: pointer;
+    color: #6d6464; /* Default color (Gray/untracked) */
+    transition: color 0.2s;
+    z-index: 10; /* Ensures it stays above the image */
+}
+
+/* Style when the product IS tracked (ON CLICK) */
+.wishlist-btn.tracked {
+    color: red; 
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(255, 0, 0, 0.8);
+    filter: drop-shadow(0 0 3px rgba(255, 0, 0, 0.6));
+}
+
+/* Optional: Hover effect */
+.wishlist-btn:hover:not(.tracked) {
+    color: #726767;
+}
+    </style>
+</head>
+<body class="bg-dark-900 text-slate-300 font-sans antialiased">
+
+    <div id="landing-page">
+        
+        <nav class="fixed top-0 w-full z-50 glass-nav border-b border-dark-700">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-2 cursor-pointer" onclick="window.location.reload()">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-teal to-brand-blue flex items-center justify-center text-white font-bold">
+                            <!-- <img src="logo.png" alt="Logo" class="w-6 h-6"> -->
+                            <i class="ph ph-robot"></i>
+                        </div>
+                        <span class="text-white font-bold text-xl tracking-tight">One<span class="text-brand-teal">Click</span></span>
+                    </div>
+
+                    <div class="hidden md:flex space-x-8">
+                        <a href="#home" class="text-white hover:text-brand-teal transition">Home</a>
+                        <a href="#about" class="text-slate-300 hover:text-white transition">About Us</a>
+                        <a href="#contact" class="text-slate-300 hover:text-white transition">Contact Us</a>
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <button type="button" onclick="openAuthModal('login', event); return false;" class="text-slate-300 hover:text-white font-medium transition hidden md:block">
+                            Login
+                        </button>
+                        <button type="button" onclick="openAuthModal('register', event); return false;" class="bg-brand-teal text-dark-900 px-5 py-2 rounded-full font-bold hover:bg-teal-300 transition shadow-lg shadow-teal-500/20">
+                            Sign Up
+                        </button>
+                        <div class="flex items-center space-x-4">
+
+    <a href="/admin/login" class="px-4 py-2 border border-gray-600 rounded-full text-xs hover:bg-gray-800 transition">Admin</a>
+</div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <section id="home" class="relative pt-32 pb-20 hero-gradient min-h-screen flex items-center">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h1 class="text-4xl md:text-6xl font-extrabold text-white mb-6">
+                    AI-Powered <span class="text-brand-teal">Price Comparison</span>
+                </h1>
+                <p class="text-lg text-slate-400 mb-10 max-w-2xl mx-auto">
+                    Stop overpaying. Our AI scans millions of products in real-time to find you the absolute best deals, history trends, and price drops.
+                </p>
+                
+                <div class="relative max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-2xl border border-dark-700 group">
+                    <div class="absolute inset-0 bg-brand-teal/10 pointer-events-none group-hover:bg-transparent transition"></div>
+                    <!-- <img src="C:\xampp\htdocs\price_compare_system\indexpicture.png" alt="AI Dashboard Preview" class="w-full h-auto opacity-90"> -->
+                    <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop" alt="AI Dashboard Preview" class="w-full h-auto opacity-90">
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div class="bg-dark-900/80 backdrop-blur-md border border-brand-teal p-4 rounded-xl shadow-2xl">
+                            <p class="text-brand-teal font-bold text-xl">AI Deal Finder Active</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="about" class="py-20 bg-dark-800 border-t border-dark-700">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl font-bold text-white">About Us</h2>
+                    <p class="text-slate-400 mt-4">We are revolutionizing how you shop online.</p>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-8 ">
+                    <div class="p-6 bg-dark-900 rounded-xl border border-dark-700 hover:border hover:border-[#2dd4bf] transition">
+                        <div class="w-12 h-12 bg-brand-teal/20 text-brand-teal rounded-lg flex items-center justify-center text-2xl mb-4"><i class="ph ph-lightning"></i></div>
+                        <h3 class="text-xl font-bold text-white mb-2">Smart Price Alerts</h3>
+                        <p class="text-slate-400">Track products and get notified on price drops.</p>
+                    </div>
+                    <div class="p-6 bg-dark-900 rounded-xl border border-dark-700 hover:border hover:border-[#2dd4bf] transition">
+                        <div class="w-12 h-12 bg-blue-500/20 text-blue-500 rounded-lg flex items-center justify-center text-2xl mb-4"><i class="ph ph-brain"></i></div>
+                        <h3 class="text-xl font-bold text-white mb-2">AI Prediction</h3>
+                        <p class="text-slate-400">Our multimodal AI understands both images and text to find the exact product you're looking for across our entire database.</p>
+                    </div>
+                    <div class="p-6 bg-dark-900 rounded-xl border border-dark-700 hover:border hover:border-[#2dd4bf] transition">
+                        <div class="w-12 h-12 bg-purple-500/20 text-purple-500 rounded-lg flex items-center justify-center text-2xl mb-4"><i class="ph ph-shield-check"></i></div>
+                        <h3 class="text-xl font-bold text-white mb-2">Trusted Sources</h3>
+                        <p class="text-slate-400">We only compare prices from verified, trustworthy retailers to ensure your safety.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact" class="py-20 bg-dark-900 border-t border-dark-700 ">
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 hover:border hover:border-[#2dd4bf] p-6 rounded-2xl transition-shadow shadow-lg shadow-teal-500/10">
+                <div class="text-center mb-10">
+                    <h2 class="text-3xl font-bold text-white">Contact Us</h2>
+                    <p class="text-slate-400 mt-2">Have a question? We'd love to hear from you.</p>
+                </div>
+
+                <form id="contact-form" class="space-y-6 bg-dark-800 p-8 rounded-2xl border border-dark-700 shadow-xl">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300">Your Name</label>
+                        <input id="contact-name" type="text" class="mt-1 block w-full px-4 py-3 bg-dark-900 border border-dark-700 rounded-lg text-white focus:ring-brand-teal focus:border-brand-teal focus:outline-none" placeholder="John Doe">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300">Email Address</label>
+                        <input id="contact-email" type="email" class="mt-1 block w-full px-4 py-3 bg-dark-900 border border-dark-700 rounded-lg text-white focus:ring-brand-teal focus:border-brand-teal focus:outline-none" placeholder="john@example.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300">Message</label>
+                        <textarea id="contact-message" rows="4" class="mt-1 block w-full px-4 py-3 bg-dark-900 border border-dark-700 rounded-lg text-white focus:ring-brand-teal focus:border-brand-teal focus:outline-none" placeholder="How can we help?"></textarea>
+                    </div>
+                    <button id="contact-send" type="button" class="w-full bg-brand-teal text-dark-900 font-bold py-3 rounded-lg hover:bg-teal-300 transition">
+                        Send Message
+                    </button>
+                    <p id="contact-status" class="text-sm text-slate-400"></p>
+                </form>
+            </div>
+        </section>
+        
+        <footer class="bg-dark-900 py-8 text-center text-slate-500 text-sm border-t border-dark-700">
+            &copy; 2026 PriceAI System. All rights reserved.
+        </footer>
+    </div>
+
+    <div id="auth-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-dark-800 p-8 rounded-2xl border border-dark-700 w-full max-w-md shadow-2xl relative transform transition-all duration-300 scale-100">
+            
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="ph ph-x text-2xl"></i>
+            </button>
+            
+            <h2 id="modal-title" class="text-2xl font-bold text-white mb-6 text-center">Welcome Back</h2>
+            
+            <div id="login-form" class="space-y-4 block">
+                <div>
+                    <label class="text-sm text-slate-400">Email</label>
+                    <input type="email" placeholder="user@priceai.com" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal transition">
+                </div>
+                <div>
+                    <label class="text-sm text-slate-400">Password</label>
+                    <input type="password" placeholder="••••••••" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal transition">
+                </div>
+                <!-- <div class="flex items-center gap-2 text-sm text-slate-400">
+                    <input id="login-admin" type="checkbox" class="accent-brand-teal" />
+                    <label for="login-admin">Login as admin</label>
+                </div> -->
+                <button onclick="performAuth('login')" class="w-full bg-brand-teal text-dark-900 font-bold py-3 rounded-lg hover:bg-teal-300 transition mt-2 shadow-lg shadow-teal-500/20">
+                    Sign In
+                </button>
+                <div class="text-center mt-4">
+                    <p class="text-sm text-slate-400">Don't have an account? <span onclick="switchMode('register')" class="text-brand-teal font-bold cursor-pointer hover:underline">Sign Up</span></p>
+                </div>
+            </div>
+
+            <div id="register-form" class="space-y-4 hidden">
+                <div>
+                    <label class="text-sm text-slate-400">Full Name</label>
+                    <input type="text" placeholder="John Doe" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal transition">
+                </div>
+                <div>
+                    <label class="text-sm text-slate-400">Email</label>
+                    <input type="email" placeholder="user@priceai.com" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal transition">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-sm text-slate-400">Password</label>
+                        <input type="password" placeholder="Create" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal transition">
+                    </div>
+                    <div>
+                        <label class="text-sm text-slate-400">Confirm</label>
+                        <input type="password" placeholder="Confirm" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-3 text-white focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal transition">
+                    </div>
+                </div>
+                
+                <button onclick="performAuth('register')" class="w-full bg-brand-teal text-dark-900 font-bold py-3 rounded-lg hover:bg-teal-300 transition mt-2 shadow-lg shadow-teal-500/20">
+                    Create Account
+                </button>
+                <div class="text-center mt-4">
+                    <p class="text-sm text-slate-400">Already have an account? <span onclick="switchMode('login')" class="text-brand-teal font-bold cursor-pointer hover:underline">Log In</span></p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="dashboard-view" class="hidden-section flex h-screen overflow-hidden bg-dark-900">
+        
+        <aside class="hidden md:flex w-20 flex-col items-center py-6 bg-dark-800 border-r border-dark-700 z-20">
+            <div class="mb-8 text-brand-teal text-2xl"><i class="ph ph-robot"></i></div>
+            
+                <nav class="flex-1 space-y-6">
+                <!-- <a href="#" class="p-3 rounded-xl bg-dark-700 text-brand-teal shadow-lg shadow-teal-500/10 transition"><i class="ph ph-squares-four text-xl"></i></a> -->
+<br><br>
+                <a href="/wishlist" class="p-3 rounded-xl text-slate-400 hover:text-white hover:bg-dark-700 transition"><i class="ph ph-heart text-xl"></i></a>
+                <div class="relative">
+                    <a href="#" id="admin-replies-btn" class="p-3 rounded-xl text-slate-400 hover:text-white hover:bg-dark-700 transition" title="Admin Replies">
+                        <i class="ph ph-chat-text text-xl"></i>
+                    </a>
+                    <span id="admin-reply-badge" class="absolute -mt-1 -mr-1 top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full hidden">0</span>
+                </div>
+            </nav>
+            
+            <button onclick="logout()" class="mb-4 p-3 rounded-xl text-red-400 hover:bg-red-500/10 transition" title="Logout">
+                <i class="ph ph-sign-out text-xl"></i>
+            </button>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+            <div class="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-brand-teal/5 to-transparent pointer-events-none"></div>
+
+            <header class="h-16 border-b border-dark-700 flex items-center justify-between px-8 bg-dark-900/90 backdrop-blur z-10">
+                <h1 class="text-lg font-bold text-white">Dashboard</h1>
+                <div class="flex items-center gap-4">
+                    <div class="text-right hidden sm:block">
+                        <span id="user-display-name" class="block text-sm font-bold text-white">Demo User</span>
+                        <!-- <span class="block text-xs text-brand-teal">Premium Plan</span> -->
+                    </div>
+                    <img id="user-avatar" src="https://ui-avatars.com/api/?name=User&background=2dd4bf&color=0f172a" class="w-10 h-10 rounded-full border-2 border-dark-700">
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-8">
+                
+                <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Price Tracker</h2>
+                        <p class="text-slate-400 text-sm">We are revolutionizing how you shop online.</p>
+                    </div>
+                    <div class="flex gap-2 w-full md:w-[500px]">
+                        <div class="relative flex-1">
+                            <input type="text" id="product-search-input" class="w-full bg-dark-800 border border-dark-700 rounded-lg py-2.5 pl-4 pr-10 text-white focus:border-brand-teal focus:outline-none placeholder-slate-500" placeholder="Paste product link or name...">
+                            <button onclick="searchProduct()" class="absolute right-1 top-1 bg-brand-teal p-1.5 rounded text-dark-900 hover:bg-teal-300 transition">
+                                <i class="ph ph-magnifying-glass font-bold"></i>
+                            </button>
+                        </div>
+                        
+                        <input type="file" id="image-upload-input" class="hidden" accept="image/*" onchange="uploadImage()">
+                        <button onclick="document.getElementById('image-upload-input').click()" class="bg-dark-800 border border-dark-700 p-2.5 rounded-lg text-slate-300 hover:text-white hover:border-brand-teal transition" title="Search by Image">
+                            <i class="ph ph-camera text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-dark-800 p-5 rounded-xl border border-dark-700 shadow-lg cursor-pointer hover:border-brand-teal transition" title="WishList Products Count">
+                        <div class="flex justify-between">
+                            <div>
+                                <p class="text-slate-400 text-xs uppercase">Tracking</p>
+                                <h3 id="tracking-count" class="text-2xl font-bold text-white">0 Items</h3>
+                            </div>
+                            <div class="text-brand-teal text-3xl"><i class="ph ph-tag"></i></div>
+                        </div>
+                    </div>
+                    <div id="alerts-card" onclick="openAlertsViewModal()" class="bg-dark-800 p-5 rounded-xl border border-dark-700 shadow-lg cursor-pointer hover:border-blue-500 transition" title="Active: Alerts waiting for price drops. Dropped: Price alerts that have been triggered.">
+                        <div class="flex justify-between">
+                            <div>
+                                <p class="text-slate-400 text-xs uppercase">Alerts</p>
+                                <h3 id="alerts-count" class="text-2xl font-bold text-white">0 Active</h3>
+                                <p id="dropped-count" class="text-xs text-green-400 mt-1">0 Dropped</p>
+                            </div>
+                            <div class="text-blue-500 text-3xl"><i class="ph ph-bell"></i></div>
+                        </div>
+                    </div>
+                    <div id="filter-card" onclick="openFilterModal()" class="bg-dark-800 p-5 rounded-xl border border-dark-700 shadow-lg cursor-pointer hover:border-brand-teal transition">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-slate-400 text-xs uppercase">Filters</p>
+                                <h3 class="text-2xl font-bold text-white">Filter results</h3>
+                            </div>
+                            <div class="text-teal-300 text-3xl"><i class="ph ph-funnel"></i></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
+                    <div class="w-full lg:col-span-2 bg-dark-800 p-6 rounded-xl border border-dark-700">
+                        <h3 class="text-white font-semibold mb-4">Price History Trend</h3>
+                        <div class="h-64 relative w-full">
+                            <canvas class="w-full" id="dashboardChart"></canvas>
+                        </div>
+                    </div>
+                    </div> -->
+                
+                <h3 class="text-white font-semibold mt-10 mb-4 text-xl">Search Results</h3>
+                <div id="searchResultsContainer" class="product-grid">
+                    <div class="col-span-full text-center py-16">
+                        <i class="ph ph-magnifying-glass text-6xl text-slate-600 mb-4"></i>
+                        <p class="text-xl text-slate-400 mb-2">Start your search</p>
+                        <p class="text-slate-500">Enter a product name or upload an image above to find the best prices across multiple retailers.</p>
+                    </div>
+                </div>
+                </div>
+        </main>
+    </div>
+
+    <div id="filter-modal" class="fixed inset-0 z-[65] hidden flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-dark-800 p-6 rounded-2xl border border-dark-700 w-full max-w-lg relative">
+            <button onclick="closeFilterModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="ph ph-x text-2xl"></i>
+            </button>
+            <h3 class="text-white text-xl font-bold mb-4">Filter Results</h3>
+            <div class="space-y-4">
+                <label class="block text-sm text-slate-400">Filter By</label>
+                <select id="filter-type" onchange="onFilterTypeChange()" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-2 text-white">
+                    <option value="price">Price</option>
+                    <option value="brand">Brand</option>
+                </select>
+
+                <div id="price-filters" class="space-y-2 mt-2">
+                    <label class="text-sm text-slate-400">Sort</label>
+                    <div class="flex items-center gap-3">
+                        <label class="inline-flex items-center gap-2"><input id="sort-increasing" type="checkbox" class="rounded"> Sort by increasing price</label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input id="min-price" type="number" placeholder="Min price" class="bg-dark-900 border border-dark-700 rounded-lg p-2 text-white">
+                        <input id="max-price" type="number" placeholder="Max price" class="bg-dark-900 border border-dark-700 rounded-lg p-2 text-white">
+                    </div>
+                </div>
+
+                <div id="brand-filters" class="hidden mt-2">
+                    <label class="text-sm text-slate-400">Select Brand</label>
+                    <select id="brand-select" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-2 text-white">
+                        <option value="">(Select a brand)</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end gap-2 mt-4">
+                    <button onclick="applyFilter()" class="bg-brand-teal text-dark-900 px-4 py-2 rounded-lg font-bold">Apply</button>
+                    <button onclick="closeFilterModal()" class="bg-dark-700 text-slate-300 px-4 py-2 rounded-lg">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="alert-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-dark-800 p-6 rounded-2xl border border-dark-700 w-full max-w-md relative">
+            <button onclick="closeAlertModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="ph ph-x text-2xl"></i>
+            </button>
+            <h3 class="text-white text-xl font-bold mb-4">Set Price Alert</h3>
+            <div class="space-y-3">
+                <p class="text-slate-400 text-sm" id="alert-product-name"></p>
+                <label class="block text-sm text-slate-400">Target Price (numeric)</label>
+                <input id="alert-target-price" type="number" step="0.01" class="w-full bg-dark-900 border border-dark-700 rounded-lg p-2 text-white" placeholder="e.g. 299.00">
+                <div class="flex justify-end gap-2 mt-4">
+                    <button onclick="createAlert()" class="bg-brand-teal text-dark-900 px-4 py-2 rounded-lg font-bold">Set Alert</button>
+                    <button onclick="closeAlertModal()" class="bg-dark-700 text-slate-300 px-4 py-2 rounded-lg">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts View Modal -->
+    <div id="alerts-view-modal" class="fixed inset-0 z-[75] hidden flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-dark-800 p-6 rounded-2xl border border-dark-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
+            <button onclick="closeAlertsViewModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white z-10">
+                <i class="ph ph-x text-2xl"></i>
+            </button>
+            <h3 class="text-white text-xl font-bold mb-4">All Price Alerts</h3>
+            <div id="alerts-list-container" class="space-y-4">
+                <p class="text-slate-400 text-center py-8">Loading alerts...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Configuration
+    const API_BASE_URL = 'http://127.0.0.1:5000/api'; // Flask default address
+
+    // DOM Elements
+    const landingPage = document.getElementById('landing-page');
+    const dashboardView = document.getElementById('dashboard-view');
+    const authModal = document.getElementById('auth-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const userDisplayName = document.getElementById('user-display-name');
+    const userAvatar = document.getElementById('user-avatar');
+    
+    // NEW DOM ELEMENT FOR GRID
+    const productGridContainer = document.getElementById('searchResultsContainer'); 
+    // Hold the last fetched products so filters can use them
+    window.lastSearchResults = window.lastSearchResults || [];
+
+    // --- AUTH MODAL FUNCTIONS ---
+
+    function openAuthModal(mode, evt) {
+        const event = evt || window.event;
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        authModal.classList.remove('hidden');
+        switchMode(mode);
+        return false;
+    }
+
+    // --- FILTER HELPERS ---
+    function openFilterModal() {
+        if (!window.lastSearchResults || window.lastSearchResults.length === 0) {
+            alert('No products loaded. Perform a search first to populate filter options.');
+            return;
+        }
+        document.getElementById('filter-modal').classList.remove('hidden');
+        onFilterTypeChange();
+        populateBrandDropdown();
+    }
+
+    function closeFilterModal() {
+        document.getElementById('filter-modal').classList.add('hidden');
+    }
+
+    function onFilterTypeChange() {
+        const t = document.getElementById('filter-type').value;
+        document.getElementById('price-filters').classList.toggle('hidden', t !== 'price');
+        document.getElementById('brand-filters').classList.toggle('hidden', t !== 'brand');
+    }
+
+    function populateBrandDropdown() {
+        const sel = document.getElementById('brand-select');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">(Select a brand)</option>';
+        const brands = Array.from(new Set((window.lastSearchResults || []).map(p => p.brand).filter(Boolean))).sort();
+        brands.forEach(b => {
+            const opt = document.createElement('option');
+            opt.value = b;
+            opt.textContent = b;
+            sel.appendChild(opt);
+        });
+    }
+
+    function parsePriceString(s) {
+        if (s === undefined || s === null) return 0;
+        const n = parseFloat(String(s).replace(/[^0-9.]/g, ''));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function applyFilter() {
+        if (!window.lastSearchResults || window.lastSearchResults.length === 0) {
+            alert('No products to filter.');
+            return;
+        }
+        const type = document.getElementById('filter-type').value;
+        let filtered = window.lastSearchResults.slice();
+
+        if (type === 'price') {
+            const min = parseFloat(document.getElementById('min-price').value) || 0;
+            const maxRaw = document.getElementById('max-price').value;
+            const max = maxRaw ? parseFloat(maxRaw) : Number.POSITIVE_INFINITY;
+            filtered = filtered.filter(p => {
+                const price = parsePriceString(p.price);
+                return price >= min && price <= max;
+            });
+            const sortIncreasing = document.getElementById('sort-increasing').checked;
+            if (sortIncreasing) filtered.sort((a, b) => parsePriceString(a.price) - parsePriceString(b.price));
+        } else if (type === 'brand') {
+            const brand = document.getElementById('brand-select').value;
+            if (brand) filtered = filtered.filter(p => String(p.brand) === brand);
+        }
+
+        renderProductGrid(filtered);
+        closeFilterModal();
+    }
+
+    // --- ALERT MODAL JS ---
+    function openAlertModal(buttonOrElem) {
+        let product;
+        if (typeof buttonOrElem === 'string') {
+            try { 
+                product = JSON.parse(decodeURIComponent(buttonOrElem)); 
+            } catch(e){ 
+                try { 
+                    product = JSON.parse(buttonOrElem); 
+                } catch(err) {
+                    product = null; 
+                }
+            }
+        } else if (buttonOrElem && buttonOrElem.getAttribute) {
+            // Try new method: data-product-index
+            const productIndex = buttonOrElem.getAttribute('data-product-index');
+            if (productIndex && window.productDataStore && window.productDataStore[productIndex]) {
+                product = window.productDataStore[productIndex];
+            } else {
+                // Fallback: try old method with data-product attribute
+                try { 
+                    const encodedData = buttonOrElem.getAttribute('data-product');
+                    if (encodedData) {
+                        const decodedData = decodeURIComponent(encodedData);
+                        product = JSON.parse(decodedData); 
+                    }
+                } catch(e){ 
+                    try {
+                        // Fallback: try parsing without decoding (for backward compatibility)
+                        const rawData = buttonOrElem.getAttribute('data-product');
+                        if (rawData) {
+                            product = JSON.parse(rawData); 
+                        }
+                    } catch(err) {
+                        product = null; 
+                    }
+                }
+            }
+        }
+        if (!product) {
+            alert('Product data missing for alert.');
+            return;
+        }
+        window._pendingAlertProduct = product;
+        document.getElementById('alert-product-name').innerText = product.product_name || product.product_name;
+        // default target to current price (parsed)
+        const current = parseFloat(String(product.price).replace(/[^0-9.]/g, '')) || '';
+        document.getElementById('alert-target-price').value = current;
+        document.getElementById('alert-modal').classList.remove('hidden');
+    }
+
+    function closeAlertModal(){
+        document.getElementById('alert-modal').classList.add('hidden');
+        window._pendingAlertProduct = null;
+    }
+
+    async function createAlert(){
+        const input = document.getElementById('alert-target-price');
+        const val = input.value;
+        if (!val) { alert('Please enter a numeric target price.'); return; }
+
+        const product = window._pendingAlertProduct;
+        if (!product) { alert('No product selected.'); return; }
+
+        try {
+            const resp = await fetch('/api/alerts/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product: product, target_price: val })
+            });
+            const j = await resp.json();
+            if (j.success) {
+                alert('Alert created successfully. You will be notified when price drops.');
+                closeAlertModal();
+                updateDashboardStatus(); // Refresh alerts count
+            } else {
+                alert('Could not create alert: ' + (j.message || 'server error'));
+            }
+        } catch (e) {
+            console.error('Error creating alert', e);
+            alert('Network error creating alert.');
+        }
+    }
+
+    // --- ALERTS VIEW MODAL FUNCTIONS ---
+    async function openAlertsViewModal() {
+        document.getElementById('alerts-view-modal').classList.remove('hidden');
+        await fetchAlerts();
+        // Send email notification when alerts modal is opened
+        await sendAlertsEmail();
+    }
+
+    function closeAlertsViewModal() {
+        document.getElementById('alerts-view-modal').classList.add('hidden');
+    }
+
+    async function sendAlertsEmail() {
+        try {
+            const response = await fetch('/api/alerts/send-email');
+            const data = await response.json();
+            if (data.success) {
+                console.log('Alert details email sent successfully');
+            }
+        } catch (error) {
+            console.error('Error sending alerts email:', error);
+        }
+    }
+
+    async function deleteAlert(alertId) {
+        if (!confirm('Are you sure you want to delete this alert?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/alerts/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ alert_id: alertId })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Alert deleted successfully.');
+                await fetchAlerts(); // Refresh the alerts list
+                updateDashboardStatus(); // Update dashboard counts
+            } else {
+                alert('Error deleting alert: ' + (data.message || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting alert:', error);
+            alert('Failed to connect to server.');
+        }
+    }
+
+    async function fetchAlerts() {
+        const container = document.getElementById('alerts-list-container');
+        container.innerHTML = '<p class="text-slate-400 text-center py-8">Loading alerts...</p>';
+        
+        try {
+            const response = await fetch('/api/alerts/view');
+            const data = await response.json();
+            
+            if (data.success && data.alerts) {
+                if (data.alerts.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-12">
+                            <i class="ph ph-bell-slash text-6xl text-slate-600 mb-4"></i>
+                            <p class="text-xl text-slate-400 mb-2">No price alerts yet</p>
+                            <p class="text-slate-500 mb-6">You haven't created any price alerts. Set alerts on products to get notified when prices drop to your target amount.</p>
+                            <p class="text-slate-500 text-sm">Tip: Search for products and click "Set Alert" to create your first price alert.</p>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = '';
+                    data.alerts.forEach(alert => {
+                        const alertCard = document.createElement('div');
+                        alertCard.className = 'bg-dark-900 p-5 rounded-lg border border-dark-700 mb-4';
+                        
+                        const statusColor = alert.notified ? 'text-green-400' : 'text-blue-400';
+                        const statusIcon = alert.notified ? 'ph-check-circle' : 'ph-clock';
+                        const priceStatus = alert.current_price && alert.current_price <= alert.target_price ? 
+                            `<span class="text-green-400 font-bold">Price reached! Current: Rs.${alert.current_price.toFixed(2)}</span>` : 
+                            (alert.current_price ? `Current: Rs.${alert.current_price.toFixed(2)}` : 'Price not available');
+                        
+                        const priceDiff = alert.current_price ? (alert.current_price - alert.target_price).toFixed(2) : null;
+                        const priceDiffClass = priceDiff && parseFloat(priceDiff) <= 0 ? 'text-green-400' : 'text-red-400';
+                        
+                        alertCard.innerHTML = `
+                            <div class="flex justify-between items-start mb-3">
+                                <div class="flex-1">
+                                    <h4 class="text-white font-semibold text-lg mb-2">${alert.product_name || 'Unknown Product'}</h4>
+                                    ${alert.image_src ? `<img src="${alert.image_src}" alt="${alert.product_name}" class="w-24 h-24 object-contain rounded-lg mb-2">` : ''}
+                                </div>
+                                <span class="${statusColor} flex items-center gap-1 text-sm font-semibold">
+                                    <i class="ph ${statusIcon}"></i>
+                                    ${alert.status}
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 text-slate-300 text-sm">
+                                <div>
+                                    <p class="text-slate-400">Target Price:</p>
+                                    <p class="text-white font-bold text-lg">Rs.${alert.target_price.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-slate-400">Current Price:</p>
+                                    <p class="text-white font-bold text-lg">${alert.current_price ? 'Rs.' + alert.current_price.toFixed(2) : 'N/A'}</p>
+                                </div>
+                                ${priceDiff !== null ? `
+                                <div>
+                                    <p class="text-slate-400">Price Difference:</p>
+                                    <p class="${priceDiffClass} font-bold text-lg">Rs.${priceDiff}</p>
+                                </div>
+                                ` : ''}
+                                <div>
+                                    <p class="text-slate-400">Created:</p>
+                                    <p class="text-white">${alert.created_at}</p>
+                                </div>
+                            </div>
+                            ${alert.notified_at ? `
+                            <div class="mt-3 pt-3 border-t border-dark-700">
+                                <p class="text-green-400 text-sm"><i class="ph ph-bell"></i> Notified: ${alert.notified_at}</p>
+                            </div>
+                            ` : ''}
+                            <div class="mt-3 flex items-center justify-between gap-3">
+                                ${alert.product_url ? `
+                                <a href="${alert.product_url}" target="_blank" rel="noopener noreferrer" class="text-brand-teal hover:underline text-sm flex items-center gap-1">
+                                    <i class="ph ph-link"></i> View Product
+                                </a>
+                                ` : (alert.product_hash && (alert.product_hash.startsWith('http://') || alert.product_hash.startsWith('https://')) ? `
+                                <a href="${alert.product_hash}" target="_blank" rel="noopener noreferrer" class="text-brand-teal hover:underline text-sm flex items-center gap-1">
+                                    <i class="ph ph-link"></i> View Product
+                                </a>
+                                ` : '<span class="text-slate-500 text-sm">No product URL available</span>')}
+                                <button onclick="deleteAlert(${alert.id})" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm font-semibold transition flex items-center gap-1">
+                                    <i class="ph ph-trash"></i> Delete
+                                </button>
+                            </div>
+                        `;
+                        container.appendChild(alertCard);
+                    });
+                }
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <i class="ph ph-warning-circle text-6xl text-red-400 mb-4"></i>
+                        <p class="text-xl text-red-400 mb-2">Unable to load alerts</p>
+                        <p class="text-slate-400 mb-2">${data.message || 'An error occurred while loading your alerts.'}</p>
+                        <p class="text-slate-500 text-sm mt-4">Please try refreshing the page or contact support if the issue persists.</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error fetching alerts:', error);
+            container.innerHTML = `
+                <div class="text-center py-12">
+                    <i class="ph ph-wifi-slash text-6xl text-red-400 mb-4"></i>
+                    <p class="text-xl text-red-400 mb-2">Connection error</p>
+                    <p class="text-slate-400 mb-2">Unable to connect to the server. Please check your internet connection.</p>
+                    <p class="text-slate-500 text-sm mt-4">Please try again in a moment.</p>
+                </div>
+            `;
+        }
+    }
+
+    function closeAuthModal() {
+        authModal.classList.add('hidden');
+    }
+
+    function switchMode(mode) {
+        if (mode === 'login') {
+            modalTitle.innerText = "Welcome Back";
+            loginForm.classList.remove('hidden');
+            registerForm.classList.add('hidden');
+        } else {
+            modalTitle.innerText = "Create Account";
+            loginForm.classList.add('hidden');
+            registerForm.classList.remove('hidden');
+        }
+    }
+
+    async function performAuth(type) {
+        let endpoint, data, emailInput, passwordInput;
+
+        if (type === 'register') {
+            emailInput = registerForm.querySelector('input[placeholder="user@priceai.com"]');
+            passwordInput = registerForm.querySelector('input[placeholder="Create"]');
+            const confirmPasswordInput = registerForm.querySelector('input[placeholder="Confirm"]');
+            const fullNameInput = registerForm.querySelector('input[placeholder="John Doe"]');
+
+            if (passwordInput.value !== confirmPasswordInput.value) {
+                alert("Error: Passwords do not match.");
+                return;
+            }
+            
+            endpoint = 'register';
+            data = {
+                fullName: fullNameInput.value,
+                email: emailInput.value,
+                password: passwordInput.value,
+            };
+        } else if (type === 'login') {
+            emailInput = loginForm.querySelector('input[placeholder="user@priceai.com"]');
+            passwordInput = loginForm.querySelector('input[placeholder="••••••••"]');
+
+            const adminCheckbox = document.getElementById('login-admin');
+            const isAdmin = adminCheckbox ? adminCheckbox.checked : false;
+            if (isAdmin) {
+                // Admin login endpoint is outside the /api base
+                endpoint = '/admin/login';
+                // The admin route expects `username` as the key
+                data = { username: emailInput.value, password: passwordInput.value };
+            } else {
+                endpoint = 'login';
+                data = { email: emailInput.value, password: passwordInput.value };
+            }
+        }
+
+        try {
+            // If endpoint is an absolute path (starts with '/'), call it directly
+            const urlToCall = endpoint.startsWith('/') ? endpoint : `${API_BASE_URL}/${endpoint}`;
+            const response = await fetch(urlToCall, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Admin login returns success but not a user object — redirect to admin dashboard
+                if (endpoint === '/admin/login') {
+                    window.location.href = '/admin';
+                    return;
+                }
+                alert(result.message);
+                const fullName = result.user.fullName || "User";
+                // ------------------------------------------------------------------
+    // *** CRITICAL FIX: STORE USER ID AND EMAIL/NAME ***
+    // ------------------------------------------------------------------
+    // Assuming your Flask API returns the user ID (e.g., result.user.id)
+    sessionStorage.setItem('user_id', result.user.id);
+    localStorage.setItem('userEmail', result.user.email);
+    localStorage.setItem('userFullName', fullName); // Store full name for later use
+    
+    // Now the addToWishlist check (if (!sessionStorage.getItem('user_id')...)) will pass!
+    // ------------------------------------------------------------------
+    
+    userDisplayName.innerText = fullName;
+    userAvatar.src = `https://ui-avatars.com/api/?name=${fullName.replace(' ', '+')}&background=2dd4bf&color=0f172a`;
+    transitionToDashboard();
+            } else {
+                alert(`Authentication Failed: ${result.message}`);
+            }
+
+        } catch (error) {
+            console.error('Network or Server Error:', error);
+            alert("Could not connect to the server. Please ensure Flask app.py is running.");
+        }
+    }
+    
+    function transitionToDashboard() {
+        closeAuthModal();
+        landingPage.classList.add('hidden-section');
+        dashboardView.classList.remove('hidden-section');
+        setTimeout(renderChart, 100); 
+    }
+
+    function logout() {
+        // Clear all stored user data
+        sessionStorage.removeItem('user_id');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userFullName');
+        
+        dashboardView.classList.add('hidden-section');
+        landingPage.classList.remove('hidden-section');
+        window.scrollTo(0, 0);
+        
+        // Reset user display
+        userDisplayName.innerText = 'Demo User';
+        userAvatar.src = 'https://ui-avatars.com/api/?name=User&background=2dd4bf&color=0f172a';
+    }
+
+    // --- CHART JS CONFIG (Remains the same) ---
+    function renderChart() {
+        const ctx = document.getElementById('dashboardChart').getContext('2d');
+        
+        if(window.myPriceChart) window.myPriceChart.destroy();
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, 'rgba(45, 212, 191, 0.4)');
+        gradient.addColorStop(1, 'rgba(45, 212, 191, 0)');
+
+        window.myPriceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Price',
+                    data: [350, 345, 360, 340, 330, 298, 298],
+                    borderColor: '#2dd4bf',
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                }
+            }
+        });
+    }
+    
+    // ====================================================================
+// 1. HELPER FUNCTION: Fetch and update the dashboard counts
+// ====================================================================
+
+function updateDashboardStatus() {
+    // This function calls the Flask endpoint /api/user/status
+    // to update the "Tracking X Items" and "Y Active Alerts" counts.
+    fetch('/api/user/status')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.status) {
+                // Assuming you have elements with these IDs in your HTML dashboard:
+                const trackingCountElement = document.getElementById('tracking-count');
+                const alertsCountElement = document.getElementById('alerts-count');
+                const droppedCountElement = document.getElementById('dropped-count');
+                const savingsElement = document.getElementById('savings-amount');
+                
+                if (trackingCountElement) {
+                    trackingCountElement.textContent = data.status.tracking_count + " Items";
+                }
+                if (alertsCountElement) {
+                    alertsCountElement.textContent = data.status.active_alerts + " Active";
+                }
+                if (droppedCountElement) {
+                    const droppedCount = data.status.dropped_alerts || 0;
+                    droppedCountElement.textContent = droppedCount + " Dropped";
+                    droppedCountElement.style.display = droppedCount > 0 ? 'block' : 'none';
+                }
+                if (savingsElement) {
+                    savingsElement.textContent = data.status.savings;
+                }
+            }
+        })
+        .catch(err => {
+            console.error("Could not fetch dashboard status:", err);
+            // Optionally, show a message on the dashboard if status fails to load
+        });
+}
+
+// ====================================================================
+// 2. MAIN FUNCTION: Handles the click on the Wishlist Button (Heart Icon)
+// ====================================================================
+
+function addToWishlist(buttonElement, evt) {
+    // Prevent any default behavior or event bubbling
+    const event = evt || window.event;
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    // 1. Check if the user is logged in (Adapt this check to your actual frontend state management)
+    // Using a placeholder check here, assuming you store user data or have a global flag.
+    if (!sessionStorage.getItem('user_id') && !localStorage.getItem('userEmail')) {
+        alert("Please log in to add items to your Price Tracker.");
+        // Ensure the button does not get the tracked class if not logged in
+        buttonElement.classList.remove('tracked'); 
+        return false;
+    }
+
+    // 2. Retrieve the product data from the button's data-product-index attribute
+    let productData;
+    try {
+        const productIndex = buttonElement.getAttribute('data-product-index');
+        if (productIndex && window.productDataStore && window.productDataStore[productIndex]) {
+            productData = window.productDataStore[productIndex];
+        } else {
+            // Fallback: try old method with data-product attribute
+            const encodedData = buttonElement.getAttribute('data-product');
+            if (encodedData) {
+                const decodedData = decodeURIComponent(encodedData);
+                productData = JSON.parse(decodedData);
+            }
+        }
+        
+        if (!productData || !productData.url) {
+             alert("Unable to add product: Missing product information. Please try refreshing the page and try again.");
+             return false;
+        }
+    } catch (e) {
+        console.error("Failed to parse product data JSON:", e);
+        alert("Unable to process product information. Please try again or refresh the page.");
+        return false;
+    }
+    
+    // Optional: Add a temporary class or disable button to prevent double-clicks
+    buttonElement.disabled = true;
+
+    // 3. Send the request to the Flask API
+    fetch('/api/wishlist/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ product: productData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log("Product successfully added:", productData.product_name);
+            
+            // SUCCESS: Change button color to Red
+            buttonElement.classList.add('tracked');
+            alert("Product added to your wishlist!");
+            
+            // Refresh dashboard counts
+            updateDashboardStatus(); 
+            
+        } else {
+            console.error(`API Error adding to wishlist: ${data.message}`);
+            alert(data.message || "Unable to add product to your wishlist. Please try again.");
+            
+            // FAILURE: Ensure button does not change color
+            buttonElement.classList.remove('tracked');
+        }
+    })
+    .catch(error => {
+        console.error('Network error during wishlist add:', error);
+                alert('Unable to connect to the server. Please check your internet connection and try again.');
+        
+        // Ensure button does not change color on failure
+        buttonElement.classList.remove('tracked');
+    })
+    .finally(() => {
+        // Re-enable the button after the operation completes
+        buttonElement.disabled = false;
+    });
+}
+
+// ====================================================================
+// 3. INITIAL CALL: Load status when the page loads
+// ====================================================================
+
+// Call this function when your dashboard page loads to populate the counts
+// window.onload = updateDashboardStatus; 
+// OR use an event listener depending on your frontend framework:
+document.addEventListener('DOMContentLoaded', updateDashboardStatus);
+
+// Function to load user details and update dashboard
+async function loadUserDetails() {
+    const storedName = localStorage.getItem('userFullName');
+    if (storedName) {
+        userDisplayName.innerText = storedName;
+        userAvatar.src = `https://ui-avatars.com/api/?name=${storedName.replace(' ', '+')}&background=2dd4bf&color=0f172a`;
+    } else {
+        // Try to fetch from API if not in localStorage
+        try {
+            const response = await fetch('/api/user/details');
+            const data = await response.json();
+            if (data.success && data.user) {
+                const fullName = data.user.full_name || "User";
+                localStorage.setItem('userFullName', fullName);
+                userDisplayName.innerText = fullName;
+                userAvatar.src = `https://ui-avatars.com/api/?name=${fullName.replace(' ', '+')}&background=2dd4bf&color=0f172a`;
+            }
+        } catch (error) {
+            console.error('Error loading user details:', error);
+        }
+    }
+}
+
+// Function to check hash and show appropriate view
+function checkHashAndShowView() {
+    // Check if URL has #dashboard-view hash
+    if (window.location.hash === '#dashboard-view') {
+        // Check if user is logged in (has sessionStorage or localStorage)
+        if (sessionStorage.getItem('user_id') || localStorage.getItem('userEmail')) {
+            // Show dashboard view
+            if (landingPage && dashboardView) {
+                landingPage.classList.add('hidden-section');
+                dashboardView.classList.remove('hidden-section');
+                // Load user details when showing dashboard
+                loadUserDetails();
+            }
+        } else {
+            // User not logged in, show home page
+            if (landingPage && dashboardView) {
+                landingPage.classList.remove('hidden-section');
+                dashboardView.classList.add('hidden-section');
+            }
+        }
+    } else {
+        // No hash or different hash, show home page by default
+        if (landingPage && dashboardView) {
+            landingPage.classList.remove('hidden-section');
+            dashboardView.classList.add('hidden-section');
+        }
+    }
+}
+
+// Check on page load
+document.addEventListener('DOMContentLoaded', function() {
+    checkHashAndShowView();
+    // Also load user details if already on dashboard
+    if (window.location.hash === '#dashboard-view') {
+        loadUserDetails();
+    }
+});
+
+// Also check when hash changes (for browser back/forward buttons)
+window.addEventListener('hashchange', function() {
+    checkHashAndShowView();
+    // Load user details when navigating to dashboard
+    if (window.location.hash === '#dashboard-view') {
+        loadUserDetails();
+    }
+});
+    // --- HELPER FUNCTION: RENDER RESULTS GRID (REPLACED TABLE FUNCTION) ---
+    // Store products in a global object to avoid HTML attribute length limits
+    window.productDataStore = window.productDataStore || {};
+    let productIndexCounter = 0;
+
+    // Renamed function to reflect the new grid layout
+    function renderProductGrid(products) {
+        productGridContainer.innerHTML = ''; // Clear existing content
+        productIndexCounter = 0; // Reset counter for new search
+        window.productDataStore = {}; // Clear previous data
+
+        if (products.length === 0) {
+                productGridContainer.innerHTML = `
+                    <div class="col-span-full text-center py-16">
+                        <i class="ph ph-magnifying-glass text-6xl text-slate-600 mb-4"></i>
+                        <p class="text-xl text-slate-400 mb-2">No products found</p>
+                        <p class="text-slate-500 mb-6">We couldn't find any products matching your search. Try:</p>
+                        <ul class="text-slate-500 text-sm space-y-1 max-w-md mx-auto">
+                            <li>• Using different keywords or search terms</li>
+                            <li>• Checking your spelling</li>
+                            <li>• Searching for a more general product category</li>
+                            <li>• Uploading a product image instead</li>
+                        </ul>
+                    </div>
+                `;
+            return;
+        }
+
+        products.forEach(p => {
+            // Store product data in global object to avoid HTML attribute issues with long URLs
+            const productIndex = `prod_${productIndexCounter++}`;
+            window.productDataStore[productIndex] = p;
+            // determine a small source logo (use provided logo or favicon fallback)
+            let sourceLogo = '';
+            try {
+                if (p.source_logo) {
+                    sourceLogo = p.source_logo;
+                } else if (p.url) {
+                    sourceLogo = `https://www.google.com/s2/favicons?domain=${(new URL(p.url)).hostname}&sz=64`;
+                } else {
+                    sourceLogo = 'https://via.placeholder.com/32/1e293b/FFFFFF?text=?';
+                }
+            } catch (e) {
+                sourceLogo = 'https://via.placeholder.com/32/1e293b/FFFFFF?text=?';
+            }
+
+            const box = document.createElement('div');
+            box.className = 'product-box';
+
+            // Generate a unique chart ID for this product
+            const chartId = `priceChart_${productIndex}`;
+            const chartContainerId = `chartContainer_${productIndex}`;
+            
+            // Store product data for hash generation
+            const productData = {
+                url: p.url || '',
+                product_name: p.product_name || '',
+                brand: p.brand || '',
+                source: p.source || ''
+            };
+            
+            // Generate hash using the same method as backend (matches what's stored in database)
+            // We'll generate it asynchronously when needed, but store the data for now
+            // For the graph button, we'll use the async function to get the hash
+            const productHashData = productData;
+
+            box.innerHTML = `
+            <div class="product-image-container">
+                <img src="${p.image_src}" alt="${p.product_name}" class="product-image" onerror="this.onerror=null;this.src='https://via.placeholder.com/300x180/1e293b/FFFFFF?text=No+Image';">
+                <button type="button" class="wishlist-btn" title="Add to WishList" data-product-index="${productIndex}" onclick="addToWishlist(this, event); return false;">
+                    <i class="ph ph-heart"></i></button>
+            </div>
+            <div class="product-details flex-1">
+                <h5 class="product-name" title="${p.product_name}">${p.product_name}</h5>
+                <p class="text-xs text-slate-400 flex items-center gap-2"><img src="${sourceLogo}" alt="${p.source}" class="w-5 h-5 rounded object-contain"> <span>Source: <strong>${p.source}</strong></span></p>
+                <p class="text-xs text-slate-400">Brand: <strong>${p.brand}</strong></p>
+                <p class="text-xs text-slate-400">Rating: ${p.rating} | Similarity: ${p.similarity_score}</p>
+            </div>
+                <div class="mt-3 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs text-slate-400">Price History</p>
+                    <button onclick="togglePriceHistoryWithProduct('${chartContainerId}', '${productIndex}')" class="text-xs text-brand-teal hover:underline cursor-pointer">
+                        <i class="ph ph-chart-line"></i> View Graph
+                    </button>
+                </div>
+                <div id="${chartContainerId}" class="hidden" style="height: 150px; position: relative;">
+                    <canvas id="${chartId}"></canvas>
+                </div>
+            </div>
+            <div class="product-footer mt-4 flex items-center justify-between gap-4">
+                <p class="product-price">Price: ${p.price}</p>
+                <div class="flex items-center gap-2">
+                    <a href="${p.url}" target="_blank" rel="noopener noreferrer" class="btn-view-deal">View Product</a>
+                    <button class="btn-set-alert" data-product-index="${productIndex}" onclick="openAlertModal(this)">Set Alert</button>
+                </div>
+            </div>
+            `;
+
+            productGridContainer.appendChild(box);
+            
+            // Product hash will be generated on-demand when viewing graph
+        });
+    }
+
+    // --- UNIFIED SEARCH FUNCTION (Handles both Text and Image) ---
+
+    async function performSearch(type, payload) {
+        // Clear previous results and show a loading message
+        productGridContainer.innerHTML = `<p class="text-center text-brand-teal col-span-full py-10">Searching for deals...</p>`;
+        
+        let endpoint = 'search';
+        let fetchOptions = { method: 'POST' };
+
+        if (type === 'text') {
+            fetchOptions.headers = { 'Content-Type': 'application/json' };
+            fetchOptions.body = JSON.stringify({ query: payload });
+        } else if (type === 'image') {
+            const formData = new FormData();
+            formData.append('product_image', payload);
+            fetchOptions.body = formData;
+            // NOTE: Do NOT set Content-Type header when using FormData
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/${endpoint}`, fetchOptions);
+            const result = await response.json();
+
+            if (result.success) {
+                // store results for filters and populate brand list
+                window.lastSearchResults = result.results || [];
+                populateBrandDropdown();
+                // Use the new grid rendering function
+                renderProductGrid(result.results);
+            } else {
+                const errorMsg = result.message || 'Unknown error occurred';
+                // Clear container and show user-friendly error
+                productGridContainer.innerHTML = `
+                    <div class="col-span-full text-center py-16">
+                        <i class="ph ph-warning-circle text-6xl text-red-400 mb-4"></i>
+                        <p class="text-xl text-red-400 mb-2">Search failed</p>
+                        <p class="text-slate-400 mb-2">${errorMsg}</p>
+                        <p class="text-slate-500 text-sm mt-4">Please try again or contact support if the problem persists.</p>
+                    </div>
+                `;
+            }
+
+        } catch (error) {
+            console.error('Search Network or Server Error:', error);
+            productGridContainer.innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <i class="ph ph-wifi-slash text-6xl text-red-400 mb-4"></i>
+                    <p class="text-xl text-red-400 mb-2">Connection error</p>
+                    <p class="text-slate-400 mb-2">Unable to connect to the server. Please check your internet connection and try again.</p>
+                    <p class="text-slate-500 text-sm mt-4">If the problem continues, the server may be temporarily unavailable.</p>
+                </div>
+            `;
+        }
+    }
+
+    // --- HELPER: Generate product hash (matches backend logic) ---
+    async function generateProductHash(product) {
+        // Simple hash generation using Web Crypto API
+        const base = (product.url || '') + (product.product_name || '') + (product.brand || '') + (product.source || '');
+        if (!base) return '';
+        
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(base);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        } catch (e) {
+            // Fallback: use URL directly if crypto API not available
+            return product.url || base;
+        }
+    }
+
+    // --- PRICE HISTORY GRAPH FUNCTIONS ---
+    async function togglePriceHistoryWithProduct(containerId, productIndex) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        if (container.classList.contains('hidden')) {
+            container.classList.remove('hidden');
+            // Show loading state
+            const canvas = container.querySelector('canvas');
+            if (canvas) {
+                canvas.parentElement.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Loading price history...</p>';
+            }
+            
+            // Get product data and generate hash
+            // productIndex is already in format 'prod_0', 'prod_1', etc.
+            const product = window.productDataStore && window.productDataStore[productIndex];
+            if (!product) {
+                container.innerHTML = '<p class="text-xs text-red-400 text-center py-2">Product data not available</p>';
+                return;
+            }
+            
+            // Generate hash using same method as backend
+            const productHash = await generateProductHash(product);
+            await loadPriceHistoryGraph(containerId, productHash);
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+    
+    async function togglePriceHistory(containerId, productHash) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        if (container.classList.contains('hidden')) {
+            container.classList.remove('hidden');
+            // Show loading state
+            const canvas = container.querySelector('canvas');
+            if (canvas) {
+                canvas.parentElement.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Loading price history...</p>';
+            }
+            await loadPriceHistoryGraph(containerId, productHash);
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+
+    async function loadPriceHistoryGraph(containerId, productHash) {
+        if (!productHash) {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">Product hash not available</p>';
+            }
+            return;
+        }
+        
+        const chartId = containerId.replace('chartContainer_', 'priceChart_');
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        try {
+            const response = await fetch(`/api/price-history?product_hash=${encodeURIComponent(productHash)}`);
+            const data = await response.json();
+            
+            if (data.success && data.history && data.history.length > 0) {
+                // Restore canvas element
+                container.innerHTML = `<canvas id="${chartId}"></canvas>`;
+                const canvas = document.getElementById(chartId);
+                if (!canvas) return;
+                
+                // Destroy existing chart if it exists
+                if (window[`chart_${chartId}`]) {
+                    window[`chart_${chartId}`].destroy();
+                }
+                
+                const ctx = canvas.getContext('2d');
+                const labels = data.history.map(h => {
+                    // Format date for display
+                    if (h.date) return h.date;
+                    if (h.timestamp) {
+                        const date = new Date(h.timestamp);
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }
+                    return '';
+                });
+                const prices = data.history.map(h => h.price);
+                
+                const gradient = ctx.createLinearGradient(0, 0, 0, 150);
+                gradient.addColorStop(0, 'rgba(45, 212, 191, 0.3)');
+                gradient.addColorStop(1, 'rgba(45, 212, 191, 0)');
+                
+                window[`chart_${chartId}`] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Price (Rs.)',
+                            data: prices,
+                            borderColor: '#2dd4bf',
+                            backgroundColor: gradient,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#2dd4bf',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                                titleColor: '#fff',
+                                bodyColor: '#2dd4bf',
+                                borderColor: '#2dd4bf',
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Price: Rs.' + context.parsed.y.toFixed(2);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                grid: { color: '#334155' },
+                                ticks: { 
+                                    color: '#94a3b8',
+                                    callback: function(value) {
+                                        return 'Rs.' + value.toFixed(0);
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { 
+                                    color: '#94a3b8',
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    maxTicksLimit: 8
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">No price history available. Add product to wishlist to track price history.</p>';
+            }
+        } catch (error) {
+            console.error('Error loading price history:', error);
+            container.innerHTML = '<p class="text-xs text-red-400 text-center py-4">Error loading price history. Please try again.</p>';
+        }
+    }
+
+    // --- WRAPPER FUNCTIONS TO CALL performSearch ---
+
+    // 1. Text Search (for the Magnifying Glass button)
+    function searchProduct() {
+        const query = document.getElementById('product-search-input').value.trim();
+        if (query) {
+            performSearch('text', query);
+        } else {
+            alert("Please enter a product name or link for text search.");
+        }
+    }
+
+    // 2. Image Search (for the Camera button)
+    function uploadImage() {
+        const fileInput = document.getElementById('image-upload-input');
+        const file = fileInput.files[0];
+
+        if (file) {
+            performSearch('image', file);
+        } else {
+            alert("Please select an image file to upload.");
+        }
+    }
+    </script>
+
+    <!-- Admin Replies Modal -->
+    <div id="admin-reply-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-dark-900 rounded-lg w-96 max-h-[70vh] overflow-auto p-4">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-white">Admin Replies</h3>
+                <button id="admin-reply-close" class="text-slate-400 hover:text-white">Close</button>
+            </div>
+            <div id="admin-replies-list" class="space-y-3">
+                <p class="text-sm text-slate-400">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    async function fetchUserRepliesBadge(){
+        try{
+            const res = await fetch('/api/user/queries');
+            if(!res.ok) return;
+            const data = await res.json();
+            if(!data.success) return;
+            const queries = data.queries || [];
+            const replied = queries.filter(q => q.admin_reply && q.admin_reply.trim() && q.status === 'replied');
+            const badge = document.getElementById('admin-reply-badge');
+            if(replied.length > 0){
+                badge.textContent = replied.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }catch(e){ console.error('fetchUserRepliesBadge', e); }
+    }
+
+    function buildRepliesList(queries){
+        const list = document.getElementById('admin-replies-list');
+        list.innerHTML = '';
+        const replied = (queries || []).filter(q => q.admin_reply && q.admin_reply.trim() && q.status === 'replied');
+        if(replied.length === 0){
+            list.innerHTML = '<p class="text-sm text-slate-400">No replies from admin.</p>';
+            return;
+        }
+        replied.forEach(q => {
+            const item = document.createElement('div');
+            item.className = 'p-3 bg-dark-800 rounded';
+            item.innerHTML = `<div class="font-semibold text-white">${q.name || 'You'}</div><div class="text-xs text-slate-400">${q.created_at}</div><div class="mt-2 text-slate-200">${q.admin_reply}</div>`;
+            list.appendChild(item);
+        });
+    }
+
+    document.getElementById('admin-replies-btn').addEventListener('click', async (e) => {
+        e.preventDefault();
+        try{
+            const res = await fetch('/api/user/queries');
+            const data = await res.json();
+            if(!data.success){ alert(data.message || 'Could not fetch replies'); return; }
+            buildRepliesList(data.queries || []);
+            document.getElementById('admin-reply-modal').classList.remove('hidden');
+        }catch(e){ console.error('open replies', e); alert('Error fetching replies'); }
+    });
+
+    document.getElementById('admin-reply-close').addEventListener('click', () => {
+        document.getElementById('admin-reply-modal').classList.add('hidden');
+    });
+
+    // Close modal when clicking outside content
+    document.getElementById('admin-reply-modal').addEventListener('click', (e)=>{
+        if(e.target.id === 'admin-reply-modal') document.getElementById('admin-reply-modal').classList.add('hidden');
+    });
+
+    document.addEventListener('DOMContentLoaded', () => { fetchUserRepliesBadge(); });
+    </script>
+</body>
+</html>

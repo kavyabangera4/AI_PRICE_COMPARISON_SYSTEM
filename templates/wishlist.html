@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Price Tracker & Wishlist</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Tailwind (needed because this template uses Tailwind utility classes) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define the dark theme colors explicitly if not fully linked via Tailwind */
+        .bg-dark-app { background-color: #1a202c; } /* Main app background */
+        .text-slate-300 { color: #cbd5e1; }
+        .text-teal-400 { color: #2dd4bf; }
+        
+        /* 1. Card Styling - Matches the dashboard grid items (bg-slate-800) */
+        .product-card-wishlist {
+            background-color: #1f2937; 
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 2. Image Container - use a fixed height so cards line up nicely */
+        .product-image-container-wishlist {
+            position: relative;
+            height: 180px; /* Fixed height for consistent look */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            background-color: #0f172a; /* Dark background for transparent images */
+            padding: 10px;
+        }
+
+        /* 3. Image Sizing - ensure the image fits inside the container */
+        .product-image-container-wishlist img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Prevents stretching */
+            display: block;
+        }
+        .btn-view-deal {
+            display: block;
+            text-align: center;
+            padding: 10px;
+            background-color: #2dd4bf;
+            color: #0f172a;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .btn-view-deal:hover {
+            background-color: #6ee7f9;
+        }
+    </style>
+</head>
+<body class="bg-dark-app text-slate-300 font-sans antialiased min-h-screen">
+    <div class="container mx-auto p-8">
+        <h1 class="text-3xl font-bold mb-8 text-teal-400">
+        My Price Tracker & Wishlist
+        </h1>
+
+        <div class="mb-6">
+            <a href="#dashboard-view" id="back-to-search" title="Back to search" class="inline-flex items-center gap-2 px-4 py-2 rounded bg-slate-800 text-teal-400 hover:bg-slate-700 transition">
+                Back to Search
+            </a>
+        </div>
+
+        <div id="wishlist-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <p id="loading-message" class="col-span-full text-center">Loading tracked items...</p>
+        </div>
+    </div>
+
+    <script>
+        const dashboardView = document.getElementById('dashboard-view');
+        document.addEventListener('DOMContentLoaded', fetchWishlist);
+
+        // Attach handler to Back to Search link: smooth-scroll to #dashboard-view if present,
+        // otherwise let the link navigate to /dashboard-view#dashboard-view as a fallback.
+        document.addEventListener('DOMContentLoaded', function () {
+            const backBtn = document.getElementById('back-to-search');
+            if (!backBtn) return;
+            backBtn.addEventListener('click', function (e) {
+                const target = document.getElementById('dashboard-view');
+                if (target) {
+                    e.preventDefault();
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    try { target.setAttribute('tabindex', '-1'); target.focus({ preventScroll: true }); } catch (err) {}
+                    return;
+                }
+                // If target not present on this page, navigate to home with fragment so home will scroll to the section
+                // Prevent default and force navigation to root fragment
+                e.preventDefault();
+                window.location.href = '/#dashboard-view';
+            });
+        });
+
+        async function fetchWishlist() {
+            const wishlistGrid = document.getElementById('wishlist-grid');
+            
+            try {
+                const response = await fetch('/api/wishlist/view', { method: 'GET' });
+                const data = await response.json();
+                
+                wishlistGrid.innerHTML = ''; 
+
+                if (data.success) {
+                    if (data.products.length === 0) {
+                        wishlistGrid.innerHTML = `
+                            <div class="col-span-full text-center py-16">
+                                <i class="ph ph-heart text-6xl text-slate-600 mb-4"></i>
+                                <p class="text-xl text-slate-400 mb-2">Your wishlist is empty</p>
+                                <p class="text-slate-500 mb-6">You haven't added any products to track yet. Start searching for products and click the heart icon to add them to your wishlist!</p>
+                                <a href="/#dashboard-view" class="inline-block bg-brand-teal text-dark-900 px-6 py-3 rounded-lg font-bold hover:bg-teal-300 transition">
+                                    Start Searching
+                                </a>
+                            </div>
+                        `;
+                    } else {
+                        renderWishlistProducts(data.products, wishlistGrid);
+                    }
+                } else {
+                    wishlistGrid.innerHTML = `
+                        <div class="col-span-full text-center py-16">
+                            <i class="ph ph-user-circle-x text-6xl text-red-400 mb-4"></i>
+                            <p class="text-xl text-red-400 mb-2">Please sign in</p>
+                            <p class="text-slate-400 mb-6">${data.message || 'You need to be logged in to view your wishlist.'}</p>
+                            <a href="/" class="inline-block bg-brand-teal text-dark-900 px-6 py-3 rounded-lg font-bold hover:bg-teal-300 transition">
+                                Go to Sign In
+                            </a>
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                wishlistGrid.innerHTML = `
+                    <div class="col-span-full text-center py-16">
+                        <i class="ph ph-wifi-slash text-6xl text-red-400 mb-4"></i>
+                        <p class="text-xl text-red-400 mb-2">Connection error</p>
+                        <p class="text-slate-400 mb-6">Unable to load your wishlist. Please check your internet connection and try again.</p>
+                        <button onclick="fetchWishlist()" class="inline-block bg-brand-teal text-dark-900 px-6 py-3 rounded-lg font-bold hover:bg-teal-300 transition">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function renderWishlistProducts(products, container) {
+            let htmlContent = '';
+            products.forEach(product => {
+                // Use the product_hash from the API response
+                const productHash = product.product_hash || product.name.replace(/\s/g, '-').toLowerCase();
+
+                htmlContent += `
+                    <div class="product-card-wishlist p-4 flex flex-col">
+                        <div class="product-image-container-wishlist">
+                            <img 
+                                src="${product.image}" 
+                                alt="${product.name}" 
+                                class="product-image-item" 
+                                onerror="this.onerror=null;this.src='default.jpg'"
+                            >
+                        </div>
+                        
+                        <div class="flex-grow flex flex-col pt-2">
+                            <h5 class="text-lg font-semibold text-white mb-2 leading-tight">${product.name}</h5>
+                            
+                            <p class="text-3xl font-extrabold text-teal-400 mt-auto mb-3">${product.price}</p>
+                            
+                            <p class="text-xs text-slate-400">Added on: <strong>${product.date_added}</strong></p>
+                            
+
+                            
+                            <button 
+                                class="remove-wishlist-btn mt-2 w-full text-center py-1 rounded border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition duration-150"
+                                data-product-hash="${productHash}" 
+                                onclick="removeProductFromWishlist(this)"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = htmlContent;
+        }
+        
+        // ** Remove product from wishlist **
+        async function removeProductFromWishlist(buttonElement) {
+            const productHash = buttonElement.getAttribute('data-product-hash');
+            if (!productHash) {
+                alert("Error: Product information missing.");
+                return;
+            }
+            
+            if (!confirm("Are you sure you want to remove this product from your tracker?")) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/wishlist/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_hash: productHash })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Product removed from your tracker.');
+                    fetchWishlist(); // Refresh the wishlist display
+                } else {
+                    alert(`Error removing product: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error removing product from wishlist:', error);
+                alert('Failed to connect to the server to remove the product.');
+            }
+        }
+
+        // Price History Modal Functions
+        function openPriceHistoryModal(productHash) {
+            document.getElementById('price-history-modal').classList.remove('hidden');
+            loadPriceHistory(productHash);
+        }
+
+        function closePriceHistoryModal() {
+            document.getElementById('price-history-modal').classList.add('hidden');
+            document.getElementById('price-history-content').innerHTML = '<p class="text-slate-400 text-center py-8">Loading price history...</p>';
+        }
+
+        async function loadPriceHistory(productHash) {
+            const content = document.getElementById('price-history-content');
+            content.innerHTML = '<p class="text-slate-400 text-center py-8">Loading price history...</p>';
+            
+            try {
+                const response = await fetch(`/api/price-history?product_hash=${encodeURIComponent(productHash)}`);
+                const data = await response.json();
+                
+                if (data.success && data.history && data.history.length > 0) {
+                    // Create chart container
+                    content.innerHTML = `
+                        <div class="mb-4">
+                            <canvas id="priceHistoryChart" height="300"></canvas>
+                        </div>
+                        <div class="mt-4 p-4 bg-slate-900 rounded-lg">
+                            <h4 class="text-white font-semibold mb-2">Price Details</h4>
+                            <div class="space-y-1 text-sm">
+                                ${data.history.map(h => `
+                                    <div class="flex justify-between text-slate-300">
+                                        <span>${h.timestamp || h.date || 'N/A'}</span>
+                                        <span class="text-teal-400 font-semibold">Rs.${h.price.toFixed(2)}</span>
+                                        <span class="text-slate-500">${h.source || ''}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Initialize chart
+                    const ctx = document.getElementById('priceHistoryChart').getContext('2d');
+                    const labels = data.history.map(h => {
+                        if (h.date) return h.date;
+                        if (h.timestamp) {
+                            const date = new Date(h.timestamp);
+                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        }
+                        return '';
+                    });
+                    const prices = data.history.map(h => h.price);
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Price (Rs.)',
+                                data: prices,
+                                borderColor: '#2dd4bf',
+                                backgroundColor: 'rgba(45, 212, 191, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: { color: '#cbd5e1' },
+                                    grid: { color: '#334155' }
+                                },
+                                x: {
+                                    ticks: { color: '#cbd5e1' },
+                                    grid: { color: '#334155' }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    content.innerHTML = '<p class="text-slate-500 text-center py-8">No price history available for this product.</p>';
+                }
+            } catch (error) {
+                console.error('Error loading price history:', error);
+                content.innerHTML = '<p class="text-red-400 text-center py-8">Failed to load price history. Please try again.</p>';
+            }
+        }
+
+    </script>
+</body>
+</html>
